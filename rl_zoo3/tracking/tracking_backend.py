@@ -22,7 +22,7 @@ class TrackingBackend(ABC):
     }
 
     def __init__(self):
-        self.initalized = False
+        self.initialized = False
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
@@ -60,7 +60,7 @@ class TrackingBackend(ABC):
         raise NotImplementedError()
 
     def is_initalized(self) -> bool:
-        return self.initalized
+        return self.initialized
 
     def get_tracking_commit_hashes(self) -> Dict[str, str]:
         return TrackingBackend.tracking_commit_hashes
@@ -72,18 +72,18 @@ class TrackingBackend(ABC):
         if self.is_initalized():
             return
         self._setup_tracking(args=args)
-        self.initalized = True
+        self.initialized = True
 
     def finish_tracking(self) -> None:
         if not self.is_initalized():
             return
         self._finish_tracking()
-        self.initalized = False
+        self.initialized = False
 
     def get_sb3_logger(self, verbose: bool) -> Logger | None:
         if not self.is_initalized():
             print(
-                f"WARNING: Tried to obtain SB3 Logger without initalization of the tracking backend! Falling back to defaults."
+                f"WARNING: Tried to obtain SB3 Logger without initialization of the tracking backend! Falling back to defaults."
             )
             return None
         return self._get_sb3_logger(verbose=verbose)

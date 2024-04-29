@@ -23,10 +23,9 @@ class WandbBackend(TrackingBackend):
 
     @classmethod
     def argparse_del_arguments(cls, parsed_args) -> None:
-        del parsed_args.mlflow_experiment_name
-        del parsed_args.mlflow_run_description
-        del parsed_args.mlflow_tags
-        del parsed_args.mlflow_tracking_uri
+        del parsed_args.wandb_entity
+        del parsed_args.wandb_project_name
+        del parsed_args.wandb_tags
 
     def _setup_tracking(self, args) -> None:
         assert "wandb_entity" in vars(args), "Missing W&B entity (--wandb-entity)."
