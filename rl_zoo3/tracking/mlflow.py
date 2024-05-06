@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from typing import Any, Dict, Tuple, Union
 
@@ -24,6 +25,12 @@ class MLflowBackend(TrackingBackend):
         parser.add_argument(
             "--mlflow-tracking-uri", type=str, default="http://mlflow:5000", help="the uri of the mlflow server"
         )
+        parser.add_argument(
+            "--mlflow-username",
+            type=str,
+            default=None,
+            help="fallback mlflow username (for logging) if MLFLOW_TRACKING_USERNAME is not set",
+        )
 
         def parse_json_tags(json_str):
             if json_str is None or not len(json_str):
@@ -39,15 +46,16 @@ class MLflowBackend(TrackingBackend):
 
     @classmethod
     def argparse_del_arguments(cls, parsed_args) -> None:
-        del parsed_args.wandb_entity
-        del parsed_args.wandb_project_name
-        del parsed_args.wandb_tags
+        del parsed_args.mlflow_experiment_name
+        del parsed_args.mlflow_run_description
+        del parsed_args.mlflow_tracking_uri
+        del parsed_args.mlflow_username
 
     def _setup_tracking(self, args) -> None:
-        # TODO: check if MLFLOW_TRACKING_USERNAME is enough
-        # logname = os.environ["LOGNAME"]
-        # logging_user_name = f"{os.environ['HOST_USER_NAME']}@{os.environ['HOST_MACHINE_NAME']}"
-        # os.environ["LOGNAME"] = logging_user_name
+        if "MLFLOW_TRACKING_USERNAME" not in os.environ:
+            if args.mlflow_username is not None:
+                os.environ["MLFLOW_TRACKING_USERNAME"] = args.mlflow_username
+            # If none is provided, fallback to the MLflow internal username deduction based on the LOGNAME variable.
 
         tags = {}
         tags.update(self.get_tracking_commit_hashes())
@@ -63,7 +71,6 @@ class MLflowBackend(TrackingBackend):
             log_system_metrics=True,
         )
         mlflow.set_tags(tags)
-        # os.environ["LOGNAME"] = logname
 
     def _finish_tracking(self) -> None:
         mlflow.end_run()
