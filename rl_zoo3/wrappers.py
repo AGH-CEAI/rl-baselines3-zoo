@@ -336,9 +336,17 @@ class VisualRenderObsWrapper(gym.Wrapper):
     :param env: the gym environment
     """
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gym.Env):        
         super().__init__(env)
         assert env.render_mode == "rgb_array", f"Expected env.render_mode to 'rgb_array' but got '{env.render_mode}'."
+        
+        # Set an auxiliary observation space for the RGB array
+        render_shape = np.shape(env.render())
+        self._observation_space = spaces.Box(low=0, high=255, shape=render_shape, dtype=np.uint8)
+        
+    @property
+    def observation_space(self):
+        return self._observation_space
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
         assert options is None, "Options are not supported for now"
