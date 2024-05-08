@@ -323,3 +323,30 @@ class MaskVelocityWrapper(gym.ObservationWrapper):
 
     def observation(self, observation: np.ndarray) -> np.ndarray:
         return observation * self.mask
+
+
+class VisualRenderObsWrapper(gym.Wrapper):
+    """
+    Render current state as visual RGB (x, y, 3) frame and pass it as the observation.
+    Requires the "rgb_array" render mode for the environment.
+
+    Please note that this behaviour is different from the HumanRendering wrapper from the Gymnasium.
+    https://gymnasium.farama.org/_modules/gymnasium/wrappers/human_rendering/#HumanRendering
+
+    :param env: the gym environment
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        assert env.render_mode == "rgb_array", f"Expected env.render_mode to 'rgb_array' but got '{env.render_mode}'."
+
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
+        assert options is None, "Options are not supported for now"
+        _, info = self.env.reset(seed=seed)
+        obs_render = self.env.render()
+        return obs_render, info
+
+    def step(self, action) -> GymStepReturn:
+        _, reward, terminated, truncated, info = self.env.step(action)
+        obs_render = self.env.render()
+        return obs_render, reward, terminated, truncated, info
