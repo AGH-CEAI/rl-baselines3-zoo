@@ -41,11 +41,11 @@ def track_git_repos(working_path: Path | None = None) -> Dict[str, str]:
         try:
             repo = Repo(p)
         except InvalidGitRepositoryError:
-            logger.warning(f"{p} is not a git repository, but contains a .git subfolder. Skipping.")
+            logger.warning(f"WARNING: {p} is not a git repository, but contains a .git subfolder. Skipping.")
             continue
 
         if (p / IGNORE_REPO_FILENAME).is_file():
-            logger.warning(f"{p} is a git repository, but contains the {IGNORE_REPO_FILENAME} file. Skipping.")
+            logger.warning(f"WARNING: {p} is a git repository, but contains the {IGNORE_REPO_FILENAME} file. Skipping.")
             continue
 
         if repo.is_dirty():
