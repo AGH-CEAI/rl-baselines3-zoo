@@ -22,7 +22,7 @@ class TruncatedOnSuccessWrapper(gym.Wrapper):
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
         self.current_successes = 0
-        assert options is None, "Options not supported for now"
+        assert options is None, "Options are not supported for now"
         return self.env.reset(seed=seed)
 
     def step(self, action) -> GymStepReturn:
@@ -80,7 +80,7 @@ class ActionSmoothingWrapper(gym.Wrapper):
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
         self.smoothed_action = None
-        assert options is None, "Options not supported for now"
+        assert options is None, "Options are not supported for now"
         return self.env.reset(seed=seed)
 
     def step(self, action) -> GymStepReturn:
@@ -109,7 +109,7 @@ class DelayedRewardWrapper(gym.Wrapper):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
         self.current_step = 0
         self.accumulated_reward = 0.0
-        assert options is None, "Options not supported for now"
+        assert options is None, "Options are not supported for now"
         return self.env.reset(seed=seed)
 
     def step(self, action) -> GymStepReturn:
@@ -169,7 +169,7 @@ class HistoryWrapper(gym.Wrapper[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         # Flush the history
         self.obs_history[...] = 0
         self.action_history[...] = 0
-        assert options is None, "Options not supported for now"
+        assert options is None, "Options are not supported for now"
         obs, info = self.env.reset(seed=seed)
         self.obs_history[..., -obs.shape[-1] :] = obs
         return self._create_obs_from_history(), info
@@ -234,7 +234,7 @@ class HistoryWrapperObsDict(gym.Wrapper):
         # Flush the history
         self.obs_history[...] = 0
         self.action_history[...] = 0
-        assert options is None, "Options not supported for now"
+        assert options is None, "Options are not supported for now"
         obs_dict, info = self.env.reset(seed=seed)
         obs = obs_dict["observation"]
         self.obs_history[..., -obs.shape[-1] :] = obs
