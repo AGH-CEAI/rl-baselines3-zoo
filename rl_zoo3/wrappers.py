@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple, Sequence
+from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple
 
 import gymnasium as gym
 import logging
