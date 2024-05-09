@@ -2,10 +2,13 @@ from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple
 
 import gymnasium as gym
 import numpy as np
+import logging
 from gymnasium import spaces
 from gymnasium.core import ObsType
 from sb3_contrib.common.wrappers import TimeFeatureWrapper  # noqa: F401 (backward compatibility)
 from stable_baselines3.common.type_aliases import GymResetReturn, GymStepReturn
+
+logger = logging.getLogger(__name__)
 
 
 class TruncatedOnSuccessWrapper(gym.Wrapper):
@@ -336,14 +339,14 @@ class VisualRenderObsWrapper(gym.Wrapper):
     :param env: the gym environment
     """
 
-    def __init__(self, env: gym.Env):        
+    def __init__(self, env: gym.Env):
         super().__init__(env)
         assert env.render_mode == "rgb_array", f"Expected env.render_mode to 'rgb_array' but got '{env.render_mode}'."
-        
+
         # Set an auxiliary observation space for the RGB array
         render_shape = np.shape(env.render())
         self._observation_space = spaces.Box(low=0, high=255, shape=render_shape, dtype=np.uint8)
-        
+
     @property
     def observation_space(self):
         return self._observation_space
