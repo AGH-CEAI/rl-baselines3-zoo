@@ -366,13 +366,10 @@ class VisualRenderObsWrapper(gym.Wrapper):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
         assert options is None, "Options are not supported for now"
         _, info = self.env.reset(seed=seed)
-        obs_render = self._get_obs()
+        obs_render = self.env.render()
         return obs_render, info
 
     def step(self, action) -> GymStepReturn:
         _, reward, terminated, truncated, info = self.env.step(action)
-        obs_render = self._get_obs()
+        obs_render = self.env.render()
         return obs_render, reward, terminated, truncated, info
-
-    def _get_obs(self) -> np.ndarray:
-        return self.env.render()
