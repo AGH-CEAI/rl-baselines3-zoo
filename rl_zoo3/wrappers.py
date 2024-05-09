@@ -330,18 +330,21 @@ class MaskVelocityWrapper(gym.ObservationWrapper):
 
 class VisualRenderObsWrapper(gym.Wrapper):
     """
-    Render current state as visual RGB (x, y, 3) frame and pass it as the observation.
+    Render current state as visual RGB (y, x, 3) frame and pass it as the observation.
     Requires the "rgb_array" render mode for the environment.
 
     Please note that this behaviour is different from the HumanRendering wrapper from the Gymnasium.
     https://gymnasium.farama.org/_modules/gymnasium/wrappers/human_rendering/#HumanRendering
+
+    When using the ResizeObservation wrapper from Gymnasium,
+    double check the order of the axes (i.e. use (y, x), NOT (x, y)).
 
     :param env: the gym environment
     """
 
     def __init__(self, env: gym.Env):
 
-        assert "rgb_array" in env.metadata["render_modes"], f"The environment dosen't support 'rgb_array' render mode."
+        assert "rgb_array" in env.metadata["render_modes"], f"The environment doesn't support 'rgb_array' render mode."
 
         super().__init__(env)
         assert env.render_mode == "rgb_array", (
