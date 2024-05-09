@@ -3,7 +3,6 @@ from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple, Sequence
 import gymnasium as gym
 import logging
 import numpy as np
-from skimage import transform
 from gymnasium import spaces
 from gymnasium.core import ObsType
 from sb3_contrib.common.wrappers import TimeFeatureWrapper  # noqa: F401 (backward compatibility)
@@ -338,10 +337,9 @@ class VisualRenderObsWrapper(gym.Wrapper):
     https://gymnasium.farama.org/_modules/gymnasium/wrappers/human_rendering/#HumanRendering
 
     :param env: the gym environment
-    :param image_shape: the desired image, defaults to the env's rgb_array shape
     """
 
-    def __init__(self, env: gym.Env, image_shape: Sequence[int] | None = None):
+    def __init__(self, env: gym.Env):
 
         assert "rgb_array" in env.metadata["render_modes"], f"The environment dosen't support 'rgb_array' render mode."
 
@@ -351,12 +349,9 @@ class VisualRenderObsWrapper(gym.Wrapper):
             "Consider passing `--env-kwargs render_mode:\"'rgb_array'\"` as launch argument."
         )
 
-        self._is_resize_needed = True if image_shape is None else False
         # There is no guaranteed API to obtain the default size of the frame.
-        if image_shape is None:
-            env.reset()
-            image_shape = np.shape(env.render())
-        self._image_shape = image_shape
+        env.reset()
+        image_shape = np.shape(env.render())
 
         # Set an auxiliary observation space for the RGB array
         self._observation_space = spaces.Box(low=0, high=255, shape=image_shape, dtype=np.uint8)
@@ -377,7 +372,4 @@ class VisualRenderObsWrapper(gym.Wrapper):
         return obs_render, reward, terminated, truncated, info
 
     def _get_obs(self) -> np.ndarray:
-        vobs = self.env.render()
-        if not self._is_resize_needed:
-            return vobs
-        return transform.resize(vobs, (self._image_shape[0], self._image_shape[1]), anti_aliasing=False)
+        return self.env.render()
