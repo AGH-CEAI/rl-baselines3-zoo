@@ -1,14 +1,11 @@
 from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple
 
 import gymnasium as gym
-import logging
 import numpy as np
 from gymnasium import spaces
 from gymnasium.core import ObsType
 from sb3_contrib.common.wrappers import TimeFeatureWrapper  # noqa: F401 (backward compatibility)
 from stable_baselines3.common.type_aliases import GymResetReturn, GymStepReturn
-
-logger = logging.getLogger(__name__)
 
 
 class TruncatedOnSuccessWrapper(gym.Wrapper):
