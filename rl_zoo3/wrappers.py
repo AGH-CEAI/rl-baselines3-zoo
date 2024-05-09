@@ -1,8 +1,9 @@
-from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple
+from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple, Sequence
 
 import gymnasium as gym
-import numpy as np
 import logging
+import numpy as np
+from skimage import transform
 from gymnasium import spaces
 from gymnasium.core import ObsType
 from sb3_contrib.common.wrappers import TimeFeatureWrapper  # noqa: F401 (backward compatibility)
@@ -337,15 +338,28 @@ class VisualRenderObsWrapper(gym.Wrapper):
     https://gymnasium.farama.org/_modules/gymnasium/wrappers/human_rendering/#HumanRendering
 
     :param env: the gym environment
+    :param image_shape: the desired image, defaults to the env's rgb_array shape
     """
 
-    def __init__(self, env: gym.Env):
+    def __init__(self, env: gym.Env, image_shape: Sequence[int] | None = None):
+
+        assert "rgb_array" in env.metadata["render_modes"], f"The environment dosen't support 'rgb_array' render mode."
+
         super().__init__(env)
-        assert env.render_mode == "rgb_array", f"Expected env.render_mode to 'rgb_array' but got '{env.render_mode}'."
+        assert env.render_mode == "rgb_array", (
+            f"Expected env.render_mode to 'rgb_array' but got '{env.render_mode}'."
+            "Consider passing `--env-kwargs render_mode:\"'rgb_array'\"` as launch argument."
+        )
+
+        self._is_resize_needed = True if image_shape is None else False
+        # There is no guaranteed API to obtain the default size of the frame.
+        if image_shape is None:
+            env.reset()
+            image_shape = np.shape(env.render())
+        self._image_shape = image_shape
 
         # Set an auxiliary observation space for the RGB array
-        render_shape = np.shape(env.render())
-        self._observation_space = spaces.Box(low=0, high=255, shape=render_shape, dtype=np.uint8)
+        self._observation_space = spaces.Box(low=0, high=255, shape=image_shape, dtype=np.uint8)
 
     @property
     def observation_space(self):
@@ -354,10 +368,16 @@ class VisualRenderObsWrapper(gym.Wrapper):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> GymResetReturn:
         assert options is None, "Options are not supported for now"
         _, info = self.env.reset(seed=seed)
-        obs_render = self.env.render()
+        obs_render = self._get_obs()
         return obs_render, info
 
     def step(self, action) -> GymStepReturn:
         _, reward, terminated, truncated, info = self.env.step(action)
-        obs_render = self.env.render()
+        obs_render = self._get_obs()
         return obs_render, reward, terminated, truncated, info
+
+    def _get_obs(self) -> np.ndarray:
+        vobs = self.env.render()
+        if not self._is_resize_needed:
+            return vobs
+        return transform.resize(vobs, (self._image_shape[0], self._image_shape[1]), anti_aliasing=False)
