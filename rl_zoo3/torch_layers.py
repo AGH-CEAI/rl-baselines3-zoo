@@ -86,17 +86,20 @@ class PreTrainedVisionExtractor(BaseFeaturesExtractor):
         # 1. Solve problems with stacking images (how to integrate it? more channels dosent work)
         # 2. Add feature to unfreeze speecific layers
         # 3. Add feature to change Activation Function in Linear Layer
-        self.feature_extractor = self._prepare_feature_extractor(model_name, weights_id, cut_layer)
+        feature_extractor = self._prepare_feature_extractor(model_name, weights_id, cut_layer)
+        flatten = nn.Flatten()
 
         # Taken from NatureCNN class
         # Compute shape by doing one forward pass
         with th.no_grad():
-            self._n_flatten = self.feature_extractor(th.as_tensor(observation_space.sample()[None]).float()).shape[1]
-        
-        self.linear = nn.Sequential(nn.Linear(self._n_flatten, features_dim), nn.ReLU())
-        
+            obs = th.as_tensor(observation_space.sample()[None]).float()
+            n_flatten = flatten(self.feature_extractor(obs)).shape
+
+        linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
+        self.fe_model = nn.Sequential(feature_extractor, flatten, linear)
+
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.linear(self.flatten(self.feature_extractor(observations)))
+        return self.fe_model(observations)
 
     def _import_torchvision(self):
         try:
