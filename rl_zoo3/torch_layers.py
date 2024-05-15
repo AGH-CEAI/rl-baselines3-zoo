@@ -1,5 +1,6 @@
-from typing import Dict, List, Tuple, Type, Union
+from typing import Dict, List, Tuple, Type, Union, Iterable
 from collections import OrderedDict
+from abc import ABC, abstractmethod
 
 import gymnasium as gym
 import torch as th
@@ -46,60 +47,132 @@ class FlattenExtractor(BaseFeaturesExtractor):
         return self.flatten(observations)
 
 
-class PreTrainedVisionExtractor(BaseFeaturesExtractor):
+class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
     """
     Load pre-trained model from torchvision library as feature extractor.
     List of avaiable models: https://pytorch.org/vision/main/models.html
 
     :param observation_space:
-    :param features_dim: Number of features extracted.
-        This corresponds to the number of unit for the last layer.
     :param normalized_image: Whether to assume that the image is already normalized
         or not (this disables dtype and bounds checks): when True, it only checks that
         the space is a Box and has 3 dimensions.
-        Otherwise, it checks that it has expected dtype (uint8) and bounds (values in [0, 255]).
+        Otherwise, it checks that it has expected dtype (uint8)
+        and bounds (values in [0, 255]).
     :param model_name: the name of the model in the PascalCase format.
     :param weights_id: the name of the trained weights (torchvision API).
-    :param cut_layer: the name of the layer to cut the head from the backbone.
+    :param cut_on_layer: the name of the layer to cut the head from the backbone.
+    :param add_linear_layer: enables creation of linear layer
+        for enforcing output dimension.
+    :param linear_features_dim: Number of features extracted.
+            This corresponds to the number of unit for the last layer.
+    :param linear_activation_fn: The activation function to use after each layer.
     """
 
     def __init__(
         self,
         observation_space: gym.Space,
-        features_dim: int = 512,
-        normalized_image: bool = False,
-        model_name: str = None,
-        weights_id: str | None = None,
-        cut_layer: str = None,
+        normalized_image: bool,
+        add_linear_layer: bool,
+        linear_features_dim: int,
+        linear_activation_fn: Type[nn.Module],
+        stacking_frames: int | None = None,
+        frame_channels: int = 3,
     ):
-        self._import_torchvision()
         assert isinstance(observation_space, spaces.Box), (
             "PreTrainedVisionExtractor must be used with a gym.spaces.Box ",
             f"observation space, not {observation_space}",
         )
-        assert is_image_space(
-            observation_space, check_channels=False, normalized_image=normalized_image
-        ), f"You should use PreTrainedVisionExtractor only with images not with {observation_space}."
-        super().__init__(observation_space, features_dim)
-
-        # TODO:
-        # 1. Solve problems with stacking images (how to integrate it? more channels dosent work)
-        # 2. Add feature to unfreeze speecific layers
-        # 3. Add feature to change Activation Function in Linear Layer
-        feature_extractor = self._prepare_feature_extractor(model_name, weights_id, cut_layer)
+        # TODO integrate stacking_frames
+        if stacking_frames is None or stacking_frames < 2:
+            assert is_image_space(observation_space, check_channels=False, normalized_image=normalized_image), (
+                f"You should use a VisionExtractor only with images not with {observation_space}.\n"
+                "If the `stackig_frames` is greater than 1, please set the Extractor params `stackig_frames`and `frame_channels` accordingly."
+            )
+        else:
+            pass
+            # here, validate observation shape by checking it with stacking_frames * frame_channels
+            
+        feature_extractor = self._prepare_feature_extractor()
         flatten = nn.Flatten()
 
-        # Taken from NatureCNN class
         # Compute shape by doing one forward pass
         with th.no_grad():
+            #TODO for stacking_frames it is needed to pass each frame through the backbone.
+            # Then we should join them as one giant flat tensor.
             obs = th.as_tensor(observation_space.sample()[None]).float()
             n_flatten = flatten(self.feature_extractor(obs)).shape
+        output_dim = n_flatten
 
-        linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
-        self.fe_model = nn.Sequential(feature_extractor, flatten, linear)
+        self.fe_model = nn.Sequential(feature_extractor, flatten)
+        if add_linear_layer:
+            linear = nn.Sequential(nn.Linear(n_flatten, linear_features_dim), linear_activation_fn())
+            self.fe_model = nn.Sequential(self.fe_model, linear)
+            output_dim = linear_features_dim
+
+        super().__init__(observation_space, output_dim)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
+        #TODO for stacking_frames it is needed to pass each frame through the backbone.
+        # Then we should join them as one giant flat tensor.
         return self.fe_model(observations)
+
+    @abstractmethod
+    def _prepare_feature_extractor(self):
+        raise NotImplementedError()
+
+class CustomVisionExtractor(AbstractVisionExtractor):
+    def __init__(
+        self,
+        observation_space: gym.Space,
+        custom_feature_extractor: Type[nn.Module],
+        normalized_image: bool = False,
+        add_linear_layer: bool = True,
+        linear_features_dim: int = 512,
+        linear_activation_fn: Type[nn.Module] = nn.ReLU,
+        stacking_frames: int = None,
+        frame_channels: int = 3,
+    ):
+        self._custom_model = custom_feature_extractor
+        super().__init__(
+            observation_space,
+            normalized_image,
+            add_linear_layer,
+            linear_features_dim,
+            linear_activation_fn,
+            stacking_frames,
+            frame_channels,
+        )
+
+    def _prepare_feature_extractor(self):
+        return self._custom_model
+    
+class PreTrainedVisionExtractor(AbstractVisionExtractor):
+    def __init__(
+        self,
+        observation_space: gym.Space,
+        model_name: str = None,
+        weights_id: str | None = None,
+        cut_on_layer: str = None,
+        normalized_image: bool = False,
+        add_linear_layer: bool = True,
+        linear_features_dim: int = 512,
+        linear_activation_fn: Type[nn.Module] = nn.ReLU,
+        stacking_frames: int = None,
+        frame_channels: int = 3,
+    ):
+        self._import_torchvision()
+        self._model_name = model_name
+        self._weights_id = weights_id
+        self._cut_on_layer = cut_on_layer
+        super().__init__(
+            observation_space,
+            normalized_image,
+            add_linear_layer,
+            linear_features_dim,
+            linear_activation_fn,
+            stacking_frames,
+            frame_channels,
+        )
 
     def _import_torchvision(self):
         try:
@@ -109,16 +182,19 @@ class PreTrainedVisionExtractor(BaseFeaturesExtractor):
                 "Can't use PreTrainedVisionExtractor without torchvision. Please install it (`pip install torchvision`)."
             )
 
-    def _prepare_feature_extractor(self, model_name: str, weights_id: str | None = None, cut_layer: str = None):
-        pretrained_model = self._load_vision_model(model_name, weights_id)
-        return self._cut_head_layers(pretrained_model, cut_layer)
+    def _prepare_feature_extractor(self):
+        pretrained_model = self._load_vision_model(self._model_name, self._weights_id)
+        return self._cut_head_layers(pretrained_model, self._cut_on_layer)
 
     def _load_vision_model(self, model_name: str, weights_id: str | None = None) -> nn.Module:
         try:
             weights = weights_id if weights_id is None else self._thvision.models.get_weight(weights_id)
             model = self._thvision.models.get_model(model_name, weights=weights)
+
+            # TODO add feature to unfreeze speecific layers
             for param in model.parameters():
                 param.requires_grad = False
+
             return model
         except ValueError as e:
             raise ValueError(
@@ -128,11 +204,12 @@ class PreTrainedVisionExtractor(BaseFeaturesExtractor):
 
     def _cut_head_layers(self, model: nn.Module, cut_layer: str) -> nn.Module:
         layers = OrderedDict()
+
         for layer_name, layer in model.named_children():
             if layer_name == cut_layer:
                 break
-            layer.requires_grad = False
             layers[layer_name] = layer
+
         return nn.Sequential(layers)
 
 
