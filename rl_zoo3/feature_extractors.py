@@ -88,8 +88,8 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
             self.frame_channels = frame_channels
             n_channels = observation_space.shape[0]
             modulo = n_channels % frame_channels
-            divison = ceil(n_channels / frame_channels)
-            assert modulo == 0 and divison == stacking_frames, (
+            division = ceil(n_channels / frame_channels)
+            assert modulo == 0 and division == stacking_frames, (
                 f"The number of passed channels ({n_channels}) is not matching stacked frames ({stacking_frames}) and "
                 f"defined frame channels ({frame_channels}). Check `stacking_frames` and `frame_channels` configuration for given observation."
             )
@@ -162,7 +162,7 @@ class CustomVisionExtractor(AbstractVisionExtractor):
 class PreTrainedVisionExtractor(AbstractVisionExtractor):
     """
     Loads a pre-trained model from the torchvision library as feature extractor.
-    List of avaiable models: https://pytorch.org/vision/main/models.html .
+    List of available models: https://pytorch.org/vision/main/models.html .
 
     Check AbstractVisionExtractor for more information.
 
