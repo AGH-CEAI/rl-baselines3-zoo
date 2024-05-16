@@ -12,6 +12,7 @@ from torch import nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.preprocessing import is_image_space
 
+
 class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
     """
     Load pre-trained model from torchvision library as feature extractor.
@@ -39,46 +40,63 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
         normalized_image: bool,
         linear_features_dim: int,
         linear_activation_fn: Type[nn.Module],
-        stacking_frames: int | None = None,
-        frame_channels: int = 3,
+        stacking_frames: int | None,
+        frame_channels: int,
     ):
-        super().__init__(observation_space, linear_features_dim)
         assert isinstance(observation_space, spaces.Box), (
             "PreTrainedVisionExtractor must be used with a gym.spaces.Box ",
             f"observation space, not {observation_space}",
         )
-        is_single_frame = stacking_frames is None or stacking_frames < 2
-        if is_single_frame:
+        self.is_single_frame = stacking_frames is None or stacking_frames < 2
+        if self.is_single_frame:
             assert is_image_space(observation_space, check_channels=True, normalized_image=normalized_image), (
                 f"You should use a VisionExtractor only with images not with {observation_space}.\n"
                 "If the `stackig_frames` is greater than 1, please set the Extractor params `stackig_frames`and `frame_channels` accordingly."
             )
+            stacking_frames = 1  # ensure value for single frame
         else:
+            self.frame_channels = frame_channels
             n_channels = observation_space.shape[0]
             modulo = n_channels % frame_channels
-            divison = ceil(n_channels / frame_channels)        
-            assert modulo == 0 and  divison == stacking_frames, (
+            divison = ceil(n_channels / frame_channels)
+            assert modulo == 0 and divison == stacking_frames, (
                 f"The number of passed channels ({n_channels}) is not matching stacked frames ({stacking_frames}) and "
                 f"defined frame channels ({frame_channels}). Check `stacking_frames` and `frame_channels` configuration for given observation."
             )
-            
+        output_dim = linear_features_dim * stacking_frames
+        super().__init__(observation_space, output_dim)
+
         feature_extractor = self._prepare_feature_extractor()
         flatten = nn.Flatten()
 
         # Compute shape by doing one forward pass
         with th.no_grad():
             obs = th.as_tensor(observation_space.sample()[None]).float()
+            if not self.is_single_frame:
+                obs = th.split(obs, frame_channels, dim=1)[0]
             n_flatten = flatten(feature_extractor(obs)).squeeze().shape[0]
-            
+
+        # The output dimension of the linear layer is just for one frame.
+        # The result will match the output_dim in the forward() method.
         linear = nn.Sequential(nn.Linear(n_flatten, linear_features_dim), linear_activation_fn())
         self.fe_model = nn.Sequential(feature_extractor, flatten, linear)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.fe_model(observations)
+        if self.is_single_frame:
+            return self.fe_model(observations)
+
+        # Split stacked frames and extract features from them
+        frames = th.split(observations, self.frame_channels, dim=1)
+        results = [None] * len(frames)
+        for cnt, frame in enumerate(frames):
+            results[cnt] = self.fe_model(frame)
+
+        return th.cat(results, dim=1)
 
     @abstractmethod
     def _prepare_feature_extractor(self):
         raise NotImplementedError()
+
 
 class CustomVisionExtractor(AbstractVisionExtractor):
     def __init__(
@@ -103,7 +121,8 @@ class CustomVisionExtractor(AbstractVisionExtractor):
 
     def _prepare_feature_extractor(self):
         return self._custom_model
-    
+
+
 class PreTrainedVisionExtractor(AbstractVisionExtractor):
     def __init__(
         self,
