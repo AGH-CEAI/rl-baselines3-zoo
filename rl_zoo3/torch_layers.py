@@ -38,32 +38,15 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
         self,
         observation_space: gym.Space,
         normalized_image: bool,
-        linear_features_dim: int,
+        out_features_per_frame: int,
         linear_activation_fn: Type[nn.Module],
         stacking_frames: int | None,
         frame_channels: int,
     ):
-        assert isinstance(observation_space, spaces.Box), (
-            "PreTrainedVisionExtractor must be used with a gym.spaces.Box ",
-            f"observation space, not {observation_space}",
-        )
-        self.is_single_frame = stacking_frames is None or stacking_frames < 2
+        self._validate_params(observation_space, normalized_image, stacking_frames)
         if self.is_single_frame:
-            assert is_image_space(observation_space, check_channels=True, normalized_image=normalized_image), (
-                f"You should use a VisionExtractor only with images not with {observation_space}.\n"
-                "If the `stackig_frames` is greater than 1, please set the Extractor params `stackig_frames`and `frame_channels` accordingly."
-            )
-            stacking_frames = 1  # ensure value for single frame
-        else:
-            self.frame_channels = frame_channels
-            n_channels = observation_space.shape[0]
-            modulo = n_channels % frame_channels
-            divison = ceil(n_channels / frame_channels)
-            assert modulo == 0 and divison == stacking_frames, (
-                f"The number of passed channels ({n_channels}) is not matching stacked frames ({stacking_frames}) and "
-                f"defined frame channels ({frame_channels}). Check `stacking_frames` and `frame_channels` configuration for given observation."
-            )
-        output_dim = linear_features_dim * stacking_frames
+            stacking_frames = 1
+        output_dim = out_features_per_frame * stacking_frames
         super().__init__(observation_space, output_dim)
 
         feature_extractor = self._prepare_feature_extractor()
@@ -78,8 +61,31 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
 
         # The output dimension of the linear layer is just for one frame.
         # The result will match the output_dim in the forward() method.
-        linear = nn.Sequential(nn.Linear(n_flatten, linear_features_dim), linear_activation_fn())
+        linear = nn.Sequential(nn.Linear(n_flatten, out_features_per_frame), linear_activation_fn())
         self.fe_model = nn.Sequential(feature_extractor, flatten, linear)
+
+    def _validate_params(
+        self, observation_space: gym.Space, normalized_image: bool, stacking_frames: int | None, frame_channels: int
+    ):
+        assert isinstance(observation_space, spaces.Box), (
+            "PreTrainedVisionExtractor must be used with a gym.spaces.Box ",
+            f"observation space, not {observation_space}",
+        )
+        self.is_single_frame = stacking_frames is None or stacking_frames < 2
+        if self.is_single_frame:
+            assert is_image_space(observation_space, check_channels=True, normalized_image=normalized_image), (
+                f"You should use a VisionExtractor only with images not with {observation_space}.\n"
+                "If the `stackig_frames` is greater than 1, please set the Extractor params `stackig_frames`and `frame_channels` accordingly."
+            )
+        else:
+            self.frame_channels = frame_channels
+            n_channels = observation_space.shape[0]
+            modulo = n_channels % frame_channels
+            divison = ceil(n_channels / frame_channels)
+            assert modulo == 0 and divison == stacking_frames, (
+                f"The number of passed channels ({n_channels}) is not matching stacked frames ({stacking_frames}) and "
+                f"defined frame channels ({frame_channels}). Check `stacking_frames` and `frame_channels` configuration for given observation."
+            )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         if self.is_single_frame:
@@ -104,7 +110,7 @@ class CustomVisionExtractor(AbstractVisionExtractor):
         observation_space: gym.Space,
         custom_feature_extractor: Type[nn.Module],
         normalized_image: bool = False,
-        linear_features_dim: int = 512,
+        out_features_per_frame: int = 512,
         linear_activation_fn: Type[nn.Module] = nn.ReLU,
         stacking_frames: int = None,
         frame_channels: int = 3,
@@ -113,7 +119,7 @@ class CustomVisionExtractor(AbstractVisionExtractor):
         super().__init__(
             observation_space,
             normalized_image,
-            linear_features_dim,
+            out_features_per_frame,
             linear_activation_fn,
             stacking_frames,
             frame_channels,
@@ -131,7 +137,7 @@ class PreTrainedVisionExtractor(AbstractVisionExtractor):
         weights_id: str | None = None,
         cut_on_layer: str = None,
         normalized_image: bool = False,
-        linear_features_dim: int = 512,
+        out_features_per_frame: int = 512,
         linear_activation_fn: Type[nn.Module] = nn.ReLU,
         stacking_frames: int = None,
         frame_channels: int = 3,
@@ -143,7 +149,7 @@ class PreTrainedVisionExtractor(AbstractVisionExtractor):
         super().__init__(
             observation_space,
             normalized_image,
-            linear_features_dim,
+            out_features_per_frame,
             linear_activation_fn,
             stacking_frames,
             frame_channels,
