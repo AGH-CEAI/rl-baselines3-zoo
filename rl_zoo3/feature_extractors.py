@@ -50,7 +50,7 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
         frame_channels: int,
         normalized_image: bool,
     ):
-        self._validate_params(observation_space, normalized_image, stacking_frames)
+        self._validate_params(observation_space, normalized_image, stacking_frames, frame_channels)
         if self.is_single_frame:
             stacking_frames = 1
         output_dim = out_features_per_frame * stacking_frames
@@ -114,7 +114,7 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
 class CustomVisionExtractor(AbstractVisionExtractor):
     """
     Wraps user defined model for usage as visual feature extractor.
-    
+
     Check AbstractVisionExtractor for more information.
 
     :param observation_space:
@@ -134,7 +134,7 @@ class CustomVisionExtractor(AbstractVisionExtractor):
         Otherwise, it checks that it has expected dtype (uint8)
         and bounds (values in [0, 255]).
     """
-    
+
     def __init__(
         self,
         observation_space: gym.Space,
@@ -163,7 +163,7 @@ class PreTrainedVisionExtractor(AbstractVisionExtractor):
     """
     Loads a pre-trained model from the torchvision library as feature extractor.
     List of avaiable models: https://pytorch.org/vision/main/models.html .
-    
+
     Check AbstractVisionExtractor for more information.
 
     :param observation_space:
