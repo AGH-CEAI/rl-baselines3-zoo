@@ -37,12 +37,12 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
         self,
         observation_space: gym.Space,
         normalized_image: bool,
-        add_linear_layer: bool,
         linear_features_dim: int,
         linear_activation_fn: Type[nn.Module],
         stacking_frames: int | None = None,
         frame_channels: int = 3,
     ):
+        super().__init__(observation_space, linear_features_dim)
         assert isinstance(observation_space, spaces.Box), (
             "PreTrainedVisionExtractor must be used with a gym.spaces.Box ",
             f"observation space, not {observation_space}",
@@ -68,16 +68,10 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
         # Compute shape by doing one forward pass
         with th.no_grad():
             obs = th.as_tensor(observation_space.sample()[None]).float()
-            n_flatten = flatten(self.feature_extractor(obs)).shape
-        output_dim = n_flatten
-
-        self.fe_model = nn.Sequential(feature_extractor, flatten)
-        if add_linear_layer:
-            linear = nn.Sequential(nn.Linear(n_flatten, linear_features_dim), linear_activation_fn())
-            self.fe_model = nn.Sequential(self.fe_model, linear)
-            output_dim = linear_features_dim
-
-        super().__init__(observation_space, output_dim)
+            n_flatten = flatten(feature_extractor(obs)).squeeze().shape[0]
+            
+        linear = nn.Sequential(nn.Linear(n_flatten, linear_features_dim), linear_activation_fn())
+        self.fe_model = nn.Sequential(feature_extractor, flatten, linear)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.fe_model(observations)
@@ -92,7 +86,6 @@ class CustomVisionExtractor(AbstractVisionExtractor):
         observation_space: gym.Space,
         custom_feature_extractor: Type[nn.Module],
         normalized_image: bool = False,
-        add_linear_layer: bool = True,
         linear_features_dim: int = 512,
         linear_activation_fn: Type[nn.Module] = nn.ReLU,
         stacking_frames: int = None,
@@ -102,7 +95,6 @@ class CustomVisionExtractor(AbstractVisionExtractor):
         super().__init__(
             observation_space,
             normalized_image,
-            add_linear_layer,
             linear_features_dim,
             linear_activation_fn,
             stacking_frames,
@@ -120,7 +112,6 @@ class PreTrainedVisionExtractor(AbstractVisionExtractor):
         weights_id: str | None = None,
         cut_on_layer: str = None,
         normalized_image: bool = False,
-        add_linear_layer: bool = True,
         linear_features_dim: int = 512,
         linear_activation_fn: Type[nn.Module] = nn.ReLU,
         stacking_frames: int = None,
@@ -133,7 +124,6 @@ class PreTrainedVisionExtractor(AbstractVisionExtractor):
         super().__init__(
             observation_space,
             normalized_image,
-            add_linear_layer,
             linear_features_dim,
             linear_activation_fn,
             stacking_frames,
