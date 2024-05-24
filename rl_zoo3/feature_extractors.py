@@ -1,7 +1,7 @@
 from typing import Type
 from collections import OrderedDict
 from abc import ABC, abstractmethod
-from numpy import ceil
+import numpy as np
 
 import gymnasium as gym
 import torch as th
@@ -86,9 +86,9 @@ class AbstractVisionExtractor(BaseFeaturesExtractor, ABC):
             )
         else:
             self.frame_channels = frame_channels
-            n_channels = observation_space.shape[0]
-            modulo = n_channels % frame_channels
-            division = ceil(n_channels / frame_channels)
+            n_channels = observation_space.shape[0] 
+            divisions, modulo = np.divmod(n_channels, frame_channels)
+            division = np.ceil(divisions)
             assert modulo == 0 and division == stacking_frames, (
                 f"The number of passed channels ({n_channels}) is not matching stacked frames ({stacking_frames}) and "
                 f"defined frame channels ({frame_channels}). Check `stacking_frames` and `frame_channels` configuration for given observation."
