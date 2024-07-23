@@ -1,7 +1,10 @@
-from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple
+from typing import Any, ClassVar, Dict, Optional, SupportsFloat, Tuple, Type
+from collections import OrderedDict
 
+import torch.nn as nn
 import gymnasium as gym
 import numpy as np
+
 from gymnasium import spaces
 from gymnasium.core import ObsType
 from sb3_contrib.common.wrappers import TimeFeatureWrapper  # noqa: F401 (backward compatibility)
@@ -370,3 +373,87 @@ class VisualRenderObsWrapper(gym.Wrapper):
         _, reward, terminated, truncated, info = self.env.step(action)
         obs_render = self.env.render()
         return obs_render, reward, terminated, truncated, info
+
+
+class PreTrainedVisionExtractorWrapper(gym.Wrapper):
+    """
+    Pass the observation to a pre-trained feature extractor from the torchvision model lists.
+    The list: https://pytorch.org/vision/main/models.html .
+
+    :param env: the gym environment
+    :param xxx_var: yyy
+    """
+
+    # TODO unify code parts with the feature_extractors
+
+    def __init__(
+        self,
+        env: gym.Env,
+        model_name: str = None,
+        weights_id: str | None = None,
+        cut_on_layer: str = None,
+        out_features_per_frame: int = 512,
+        linear_activation_fn: Type[nn.Module] = nn.ReLU,
+        stacking_frames: int = None,
+        frame_channels: int = 3,
+        normalized_image: bool = False,
+    ):
+        super().__init__(env)
+        self._import_torchvision()
+        self._model_name = model_name
+        self._weights_id = weights_id
+        self._cut_on_layer = cut_on_layer
+        
+        self._fe_model = self._prepare_feature_extractor()
+        # Update observation space
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.ae.z_size,), dtype=np.float32)
+
+    def _import_torchvision(self):
+        try:
+            self._thvision = __import__("torchvision")
+        except ImportError:
+            raise ImportError(
+                "Can't use PreTrainedVisionExtractorWrapper without torchvision. Please install it (`pip install torchvision`)."
+            )
+            
+    def _prepare_feature_extractor(self) -> nn.Module:
+        pretrained_model = self._load_vision_model(self._model_name, self._weights_id)
+        return self._cut_head_layers(pretrained_model, self._cut_on_layer)
+
+    def _load_vision_model(self, model_name: str, weights_id: str | None = None) -> nn.Module:
+        try:
+            weights = weights_id if weights_id is None else self._thvision.models.get_weight(weights_id)
+            model = self._thvision.models.get_model(model_name, weights=weights)
+
+            # TODO add feature to unfreeze speecific layers
+            for param in model.parameters():
+                param.requires_grad = False
+
+            return model
+        except ValueError as e:
+            raise ValueError(
+                f"{e}.\nFailed to load the '{model_name}' model with '{weights_id}' weights. Ensure that the name is in "
+                f"the PascalCase format and it is listed in https://pytorch.org/vision/main/models.html."
+            )
+
+    def _cut_head_layers(self, model: nn.Module, cut_layer: str) -> nn.Module:
+        layers = OrderedDict()
+
+        for layer_name, layer in model.named_children():
+            if layer_name == cut_layer:
+                break
+            layers[layer_name] = layer
+
+        return nn.Sequential(layers)
+    
+    def reset(self) -> np.ndarray:
+        # Important: Convert to BGR to match OpenCV convention
+        return self.ae.encode_from_raw_image(self.env.reset()[:, :, ::-1]).flatten()
+        #TODO ensure, that the input is an RGB image
+        return self._fe_model(self.env.reset())
+
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
+        obs, reward, done, infos = self.env.step(action)
+        return self.ae.encode_from_raw_image(obs[:, :, ::-1]).flatten(), reward, done, infos
+        # TODO probalby there is a need to convert the obs to a torch tensor, and sent it to the gpu
+        return self._fe_model(obs).flatten(), reward, done, infos
