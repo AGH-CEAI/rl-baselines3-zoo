@@ -377,7 +377,7 @@ class VisualRenderObsWrapper(gym.Wrapper):
 
 class PreTrainedVisionExtractorWrapper(gym.Wrapper):
     """
-    Pass the observation to a pre-trained feature extractor from the torchvision model lists.
+    Pass the visual observation to a pre-trained feature extractor from the torchvision model lists.
     The list: https://pytorch.org/vision/main/models.html .
 
     :param env: the gym environment
@@ -391,12 +391,7 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
         env: gym.Env,
         model_name: str = None,
         weights_id: str | None = None,
-        cut_on_layer: str = None,
-        out_features_per_frame: int = 512,
-        linear_activation_fn: Type[nn.Module] = nn.ReLU,
-        stacking_frames: int = None,
-        frame_channels: int = 3,
-        normalized_image: bool = False,
+        cut_on_layer: str = None
     ):
         super().__init__(env)
         self._import_torchvision()
@@ -405,8 +400,10 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
         self._cut_on_layer = cut_on_layer
         
         self._fe_model = self._prepare_feature_extractor()
+        
         # Update observation space
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.ae.z_size,), dtype=np.float32)
+        obs = self._fe_model(obs).flatten()
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=obs.size(), dtype=np.float32)
 
     def _import_torchvision(self):
         try:
@@ -448,12 +445,14 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
     
     def reset(self) -> np.ndarray:
         # Important: Convert to BGR to match OpenCV convention
-        return self.ae.encode_from_raw_image(self.env.reset()[:, :, ::-1]).flatten()
-        #TODO ensure, that the input is an RGB image
+        # return self.ae.encode_from_raw_image(self.env.reset()[:, :, ::-1]).flatten()
+        # TODO ensure, that the input is an RGB image
+        # TODO ENSURE IT BEFORE LAUNCHING TRAINING!
         return self._fe_model(self.env.reset())
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
         obs, reward, done, infos = self.env.step(action)
-        return self.ae.encode_from_raw_image(obs[:, :, ::-1]).flatten(), reward, done, infos
+        # return self.ae.encode_from_raw_image(obs[:, :, ::-1]).flatten(), reward, done, infos
         # TODO probalby there is a need to convert the obs to a torch tensor, and sent it to the gpu
+        # TODO check perfofrmacne with manual sending obs to gpu
         return self._fe_model(obs).flatten(), reward, done, infos
