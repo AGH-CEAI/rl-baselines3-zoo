@@ -382,7 +382,11 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
     The list: https://pytorch.org/vision/main/models.html .
 
     :param env: the gym environment
-    :param xxx_var: yyy
+    :param model_name: the name of the model in the PascalCase format.
+    :param weights_id: the name of the trained weights (torchvision API).
+    :param cut_on_layer: the name of the layer to cut the head from the backbone.
+    :param use_gpu: the bool for enabling usage of torch cuda device, enabled by default
+    :param result_device: specificies the device for the processed observation (defaults to cpu)
     """
 
     # TODO unify code parts with the feature_extractors
@@ -477,6 +481,9 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
 class ObsToDevice(gym.Wrapper):
     """
     Sends a torch tensor observation to the specified torch device
+    
+    :param env: the gym environment
+    :param device: the torch device
     """
     
     def __init__(
