@@ -398,21 +398,20 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
         weights_id: str | None = None,
         cut_on_layer: str = None,
         use_gpu: bool = True,
-        result_device: str = 'cpu',
+        result_device: str = "cpu",
     ):
         super().__init__(env)
         self._import_torchvision()
         # TODO take this as parameter from global config
-        self._th_device = th.device('cuda') if use_gpu else th.device('cpu')
-        
+        self._th_device = th.device("cuda") if use_gpu else th.device("cpu")
+
         self._model_name = model_name
         self._weights_id = weights_id
         self._cut_on_layer = cut_on_layer
         self._result_device = result_device
-        
+
         self._fe_model = self._prepare_feature_extractor()
         self._update_observation_space()
-        
 
     def _import_torchvision(self):
         try:
@@ -422,7 +421,7 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
                 "Can't use PreTrainedVisionExtractorWrapper without torchvision. Please install it (`pip install torchvision`)."
             )
         self._transform_img_to_tensor = self._thvision.transforms.ToTensor()
-            
+
     def _prepare_feature_extractor(self) -> nn.Module:
         pretrained_model = self._load_vision_model(self._model_name, self._weights_id)
         model = self._cut_head_layers(pretrained_model, self._cut_on_layer)
@@ -453,19 +452,19 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
             layers[layer_name] = layer
 
         return nn.Sequential(layers)
-    
+
     def _update_observation_space(self) -> None:
-        # TODO improve obtaining an example observation 
+        # TODO improve obtaining an example observation
         vis_obs, _ = self.env.reset()
         vis_obs_t = self._img_to_tensor(vis_obs)
         res = self._fe_model(vis_obs_t).flatten()
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=res.size(), dtype=np.float32)
-    
+
     def _img_to_tensor(self, img: np.ndarray) -> th.Tensor:
         # Takes HxWxC as input, returnts BxCxHxW
         tensor = self._transform_img_to_tensor(img).unsqueeze(0)
         return tensor.to(self._th_device)
-    
+
     def reset(self, seed: Optional[int] = None) -> GymResetReturn:
         vis_obs, info = self.env.reset(seed=seed)
         vis_obs_t = self._img_to_tensor(vis_obs)
@@ -478,14 +477,15 @@ class PreTrainedVisionExtractorWrapper(gym.Wrapper):
         result = self._fe_model(vis_obs_t).flatten().to(self._result_device)
         return result, reward, terminated, truncated, info
 
+
 class ObsToDevice(gym.Wrapper):
     """
     Sends a torch tensor observation to the specified torch device
-    
+
     :param env: the gym environment
     :param device: the torch device
     """
-    
+
     def __init__(
         self,
         env: gym.Env,
@@ -494,7 +494,7 @@ class ObsToDevice(gym.Wrapper):
         super().__init__(env)
         assert device is not None, "Please provide torch device name (e.x. 'cpu' or 'cuda')"
         self._device = th.device(device)
-        
+
     def reset(self, seed: Optional[int] = None) -> GymResetReturn:
         obs_th, info = self.env.reset(seed=seed)
         return obs_th.to(self._device), info
