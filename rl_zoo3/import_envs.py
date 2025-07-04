@@ -45,6 +45,11 @@ try:
 except ImportError:
     pass
 
+try:
+    import aegis_gym
+except ImportError:
+    pass
+
 
 # Register no vel envs
 def create_no_vel_env(env_id: str) -> Callable[[Optional[str]], gym.Env]:
