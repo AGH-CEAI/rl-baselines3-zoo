@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [PR#7](https://github.com/AGH-CEAI/rl-baselines3-zoo/pull/7) Added sourcing of the [`aegis_gym`](https://github.com/AGH-CEAI/aegis_gym) python package to the `rl_zoo3/import_envs.py` & prepared initial hyperopt parameters in `hyperparams/ppo.yaml`.
 - [PR#6](https://github.com/AGH-CEAI/rl-baselines3-zoo/pull/6) Added `--disable-hyperopt-plots` flag for disabling plotly plots after hyperoptimization.
 - [PR#4](https://github.com/AGH-CEAI/rl-baselines3-zoo/pull/4) EnvWrapper for pre-trained torchvision models as feature extractors.
 - [PR#3](https://github.com/AGH-CEAI/rl-baselines3-zoo/pull/3) Loading pre-trained torchvision models as feature extractors.
